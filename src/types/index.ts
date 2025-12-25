@@ -7,6 +7,8 @@ export interface MenuItem {
   category: 'tea' | 'snacks' | 'extras';
   isAvailable: boolean;
   isTodaySpecial: boolean;
+  isBestSelling: boolean;
+  isLowestPrice: boolean;
   discount?: number;
 }
 
@@ -24,6 +26,14 @@ export interface Order {
   status: 'pending' | 'preparing' | 'ready' | 'completed';
   createdAt: Date;
   notes?: string;
+}
+
+export interface DailyAnalytics {
+  date: string;
+  revenue: number;
+  orders: number;
+  completedOrders: number;
+  topItems: { id: string; name: string; quantity: number; revenue: number }[];
 }
 
 export interface ShopSettings {

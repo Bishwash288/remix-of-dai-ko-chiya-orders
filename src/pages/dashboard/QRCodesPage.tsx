@@ -3,6 +3,7 @@ import { useStore } from "@/store/useStore";
 import { Button } from "@/components/ui/button";
 import { Download, Copy, Info, Image } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import JSZip from "jszip";
 
 export default function QRCodesPage() {
   const { settings } = useStore();
@@ -19,27 +20,94 @@ export default function QRCodesPage() {
     });
   };
 
-  const downloadQR = (tableNumber: number) => {
-    const svg = document.getElementById(`qr-${tableNumber}`);
-    if (!svg) return;
+  const downloadQR = (tableNumber: number): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const svg = document.getElementById(`qr-${tableNumber}`);
+      if (!svg) {
+        reject(new Error("QR not found"));
+        return;
+      }
 
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const img = new window.Image();
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new window.Image();
 
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx?.drawImage(img, 0, 0);
-      const pngFile = canvas.toDataURL("image/png");
+      img.onload = () => {
+        canvas.width = img.width * 2;
+        canvas.height = img.height * 2;
+        ctx?.scale(2, 2);
+        ctx?.drawImage(img, 0, 0);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("Failed to create blob"));
+          }
+        }, "image/png");
+      };
+
+      img.onerror = reject;
+      img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+    });
+  };
+
+  const downloadSingleQR = async (tableNumber: number) => {
+    try {
+      const blob = await downloadQR(tableNumber);
+      const url = URL.createObjectURL(blob);
       const downloadLink = document.createElement("a");
       downloadLink.download = `table-${tableNumber}-qr.png`;
-      downloadLink.href = pngFile;
+      downloadLink.href = url;
       downloadLink.click();
-    };
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download QR code",
+        variant: "destructive",
+      });
+    }
+  };
 
-    img.src = "data:image/svg+xml;base64," + btoa(svgData);
+  const downloadAllQRCodes = async () => {
+    try {
+      toast({
+        title: "Preparing download...",
+        description: "Creating ZIP file with all QR codes",
+      });
+
+      const zip = new JSZip();
+      const folder = zip.folder("dai-ko-chiya-qr-codes");
+
+      for (const tableNumber of tables) {
+        try {
+          const blob = await downloadQR(tableNumber);
+          folder?.file(`table-${tableNumber}-qr.png`, blob);
+        } catch (error) {
+          console.error(`Failed to add QR for table ${tableNumber}`, error);
+        }
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const downloadLink = document.createElement("a");
+      downloadLink.download = "dai-ko-chiya-qr-codes.zip";
+      downloadLink.href = url;
+      downloadLink.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download complete!",
+        description: `${tables.length} QR codes downloaded as ZIP`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download QR codes",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -51,7 +119,7 @@ export default function QRCodesPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline">{settings.numberOfTables} Tables</Button>
-          <Button variant="accent">
+          <Button variant="accent" onClick={downloadAllQRCodes}>
             <Download className="h-4 w-4" />
             Download All
           </Button>
@@ -65,7 +133,7 @@ export default function QRCodesPage() {
           <div>
             <p className="font-medium text-foreground">Print-ready QR codes</p>
             <p className="text-sm text-muted-foreground">
-              Each QR code includes your shop logo and is styled for a professional look. Click "Save" to download individual QR codes or "Download All" to get all at once.
+              Each QR code includes your shop logo and is styled for a professional look. Click "Save" to download individual QR codes or "Download All" to get all at once as a ZIP file.
             </p>
           </div>
         </div>
@@ -109,7 +177,7 @@ export default function QRCodesPage() {
                 <Copy className="h-3 w-3" />
                 Copy
               </Button>
-              <Button variant="accent" size="sm" onClick={() => downloadQR(tableNumber)}>
+              <Button variant="accent" size="sm" onClick={() => downloadSingleQR(tableNumber)}>
                 <Download className="h-3 w-3" />
                 Save
               </Button>

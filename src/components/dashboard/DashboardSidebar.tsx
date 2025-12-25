@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -11,18 +12,41 @@ import {
 import { Logo } from "@/components/Logo";
 import { ShopStatus } from "@/components/ShopStatus";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { icon: LayoutDashboard, label: "Overview", path: "/dashboard" },
-  { icon: ClipboardList, label: "Orders", path: "/dashboard/orders" },
-  { icon: UtensilsCrossed, label: "Menu", path: "/dashboard/menu" },
-  { icon: QrCode, label: "QR Codes", path: "/dashboard/qr-codes" },
-  { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
-  { icon: Settings, label: "Settings", path: "/dashboard/settings" },
-];
+import { useStore } from "@/store/useStore";
+import { Badge } from "@/components/ui/badge";
 
 export function DashboardSidebar() {
   const location = useLocation();
+  const { orders, lastOrderCount, setLastOrderCount, settings } = useStore();
+
+  // Count pending orders for notification badge
+  const pendingOrderCount = orders.filter(
+    (o) => o.status === "pending" || o.status === "preparing"
+  ).length;
+
+  // New orders count (orders added since last view)
+  const newOrderCount = orders.length - lastOrderCount;
+
+  // Update last order count when viewing orders page
+  useEffect(() => {
+    if (location.pathname === "/dashboard/orders" || location.pathname === "/dashboard") {
+      setLastOrderCount(orders.length);
+    }
+  }, [location.pathname, orders.length, setLastOrderCount]);
+
+  const navItems = [
+    { icon: LayoutDashboard, label: "Overview", path: "/dashboard", badge: null },
+    { 
+      icon: ClipboardList, 
+      label: "Orders", 
+      path: "/dashboard/orders", 
+      badge: pendingOrderCount > 0 ? pendingOrderCount : null 
+    },
+    { icon: UtensilsCrossed, label: "Menu", path: "/dashboard/menu", badge: null },
+    { icon: QrCode, label: "QR Codes", path: "/dashboard/qr-codes", badge: null },
+    { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics", badge: null },
+    { icon: Settings, label: "Settings", path: "/dashboard/settings", badge: null },
+  ];
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-border bg-sidebar">
@@ -54,7 +78,15 @@ export function DashboardSidebar() {
                 >
                   <item.icon className={cn("h-5 w-5", isActive && "text-accent")} />
                   {item.label}
-                  {isActive && (
+                  {item.badge !== null && (
+                    <Badge 
+                      variant="destructive" 
+                      className="ml-auto h-5 min-w-5 px-1.5 text-xs animate-pulse"
+                    >
+                      {item.badge}
+                    </Badge>
+                  )}
+                  {isActive && !item.badge && (
                     <div className="ml-auto h-1.5 w-1.5 rounded-full bg-accent" />
                   )}
                 </Link>
