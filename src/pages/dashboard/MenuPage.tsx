@@ -3,7 +3,7 @@ import { useStore } from "@/store/useStore";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Star, Pencil } from "lucide-react";
+import { Plus, Star, Pencil, Trash2, TrendingUp, TrendingDown, Award } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MenuItem } from "@/types";
 import {
@@ -13,6 +13,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,14 +33,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
 
 const categories = ["all", "tea", "snacks", "extras"] as const;
 
 export default function MenuPage() {
-  const { menuItems, addMenuItem, updateMenuItem } = useStore();
+  const { menuItems, addMenuItem, updateMenuItem, deleteMenuItem } = useStore();
   const [filter, setFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -39,6 +52,9 @@ export default function MenuPage() {
     originalPrice: "",
     category: "tea" as MenuItem["category"],
     isTodaySpecial: false,
+    isBestSelling: false,
+    isLowestPrice: false,
+    isAvailable: true,
   });
 
   const filteredItems =
@@ -47,8 +63,19 @@ export default function MenuPage() {
       : menuItems.filter((item) => item.category === filter);
 
   const todaySpecialCount = menuItems.filter((i) => i.isTodaySpecial).length;
+  const bestSellingCount = menuItems.filter((i) => i.isBestSelling).length;
+  const lowestPriceCount = menuItems.filter((i) => i.isLowestPrice).length;
 
   const handleSubmit = () => {
+    if (!formData.name || !formData.price) {
+      toast({ title: "Name and price are required", variant: "destructive" });
+      return;
+    }
+
+    const discount = formData.originalPrice
+      ? Math.round(((Number(formData.originalPrice) - Number(formData.price)) / Number(formData.originalPrice)) * 100)
+      : undefined;
+
     if (editingItem) {
       updateMenuItem(editingItem.id, {
         name: formData.name,
@@ -57,10 +84,12 @@ export default function MenuPage() {
         originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
         category: formData.category,
         isTodaySpecial: formData.isTodaySpecial,
-        discount: formData.originalPrice
-          ? Math.round(((Number(formData.originalPrice) - Number(formData.price)) / Number(formData.originalPrice)) * 100)
-          : undefined,
+        isBestSelling: formData.isBestSelling,
+        isLowestPrice: formData.isLowestPrice,
+        isAvailable: formData.isAvailable,
+        discount,
       });
+      toast({ title: "Item updated!" });
     } else {
       addMenuItem({
         id: crypto.randomUUID(),
@@ -69,12 +98,13 @@ export default function MenuPage() {
         price: Number(formData.price),
         originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
         category: formData.category,
-        isAvailable: true,
+        isAvailable: formData.isAvailable,
         isTodaySpecial: formData.isTodaySpecial,
-        discount: formData.originalPrice
-          ? Math.round(((Number(formData.originalPrice) - Number(formData.price)) / Number(formData.originalPrice)) * 100)
-          : undefined,
+        isBestSelling: formData.isBestSelling,
+        isLowestPrice: formData.isLowestPrice,
+        discount,
       });
+      toast({ title: "Item added!" });
     }
     resetForm();
   };
@@ -87,6 +117,9 @@ export default function MenuPage() {
       originalPrice: "",
       category: "tea",
       isTodaySpecial: false,
+      isBestSelling: false,
+      isLowestPrice: false,
+      isAvailable: true,
     });
     setEditingItem(null);
     setDialogOpen(false);
@@ -101,8 +134,25 @@ export default function MenuPage() {
       originalPrice: item.originalPrice?.toString() || "",
       category: item.category,
       isTodaySpecial: item.isTodaySpecial,
+      isBestSelling: item.isBestSelling,
+      isLowestPrice: item.isLowestPrice,
+      isAvailable: item.isAvailable,
     });
     setDialogOpen(true);
+  };
+
+  const handleDelete = (item: MenuItem) => {
+    setItemToDelete(item);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      deleteMenuItem(itemToDelete.id);
+      toast({ title: "Item deleted!" });
+      setItemToDelete(null);
+      setDeleteDialogOpen(false);
+    }
   };
 
   return (
@@ -115,10 +165,20 @@ export default function MenuPage() {
           <p className="text-muted-foreground">
             Add, edit, and manage your menu items
           </p>
-          <p className="mt-1 flex items-center gap-2 text-sm text-accent">
-            <Star className="h-4 w-4 fill-current" />
-            {todaySpecialCount}/{menuItems.length} Today's Special set
-          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+            <span className="flex items-center gap-1 text-accent">
+              <Star className="h-4 w-4 fill-current" />
+              {todaySpecialCount} Special
+            </span>
+            <span className="flex items-center gap-1 text-status-preparing">
+              <TrendingUp className="h-4 w-4" />
+              {bestSellingCount} Best Selling
+            </span>
+            <span className="flex items-center gap-1 text-status-ready">
+              <TrendingDown className="h-4 w-4" />
+              {lowestPriceCount} Lowest Price
+            </span>
+          </div>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -127,13 +187,13 @@ export default function MenuPage() {
               Add Item
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingItem ? "Edit Item" : "Add New Item"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label>Name</Label>
+                <Label>Name *</Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -150,7 +210,7 @@ export default function MenuPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Price (Rs.)</Label>
+                  <Label>Price (Rs.) *</Label>
                   <Input
                     type="number"
                     value={formData.price}
@@ -159,7 +219,7 @@ export default function MenuPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Original Price (optional)</Label>
+                  <Label>Original Price (for discount)</Label>
                   <Input
                     type="number"
                     value={formData.originalPrice}
@@ -184,13 +244,52 @@ export default function MenuPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between">
-                <Label>Today's Special</Label>
-                <Switch
-                  checked={formData.isTodaySpecial}
-                  onCheckedChange={(checked) => setFormData({ ...formData, isTodaySpecial: checked })}
-                />
+
+              <div className="space-y-3 rounded-lg border border-border p-4">
+                <h4 className="font-medium text-foreground">Item Tags</h4>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-accent" />
+                    <Label>Today's Special</Label>
+                  </div>
+                  <Switch
+                    checked={formData.isTodaySpecial}
+                    onCheckedChange={(checked) => setFormData({ ...formData, isTodaySpecial: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-status-preparing" />
+                    <Label>Best Selling</Label>
+                  </div>
+                  <Switch
+                    checked={formData.isBestSelling}
+                    onCheckedChange={(checked) => setFormData({ ...formData, isBestSelling: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingDown className="h-4 w-4 text-status-ready" />
+                    <Label>Lowest Price</Label>
+                  </div>
+                  <Switch
+                    checked={formData.isLowestPrice}
+                    onCheckedChange={(checked) => setFormData({ ...formData, isLowestPrice: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border pt-3">
+                  <Label>Available for order</Label>
+                  <Switch
+                    checked={formData.isAvailable}
+                    onCheckedChange={(checked) => setFormData({ ...formData, isAvailable: checked })}
+                  />
+                </div>
               </div>
+
               <Button onClick={handleSubmit} className="w-full" variant="accent">
                 {editingItem ? "Save Changes" : "Add Item"}
               </Button>
@@ -221,7 +320,10 @@ export default function MenuPage() {
         {filteredItems.map((item) => (
           <div
             key={item.id}
-            className="rounded-xl border border-border bg-card p-4 transition-all hover:shadow-card"
+            className={cn(
+              "rounded-xl border border-border bg-card p-4 transition-all hover:shadow-card",
+              !item.isAvailable && "opacity-60"
+            )}
           >
             <div className="flex items-start justify-between">
               <div>
@@ -252,21 +354,43 @@ export default function MenuPage() {
                 >
                   <Pencil className="h-4 w-4 text-muted-foreground" />
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  onClick={() => handleDelete(item)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </div>
 
-            {item.isTodaySpecial && (
-              <Badge variant="special" className="mt-2">
-                <Star className="mr-1 h-3 w-3 fill-current" />
-                Today's Special
-              </Badge>
-            )}
-
-            {item.discount && (
-              <Badge variant="discount" className="mt-2 ml-1">
-                {item.discount}% OFF
-              </Badge>
-            )}
+            {/* Tags */}
+            <div className="mt-2 flex flex-wrap gap-1">
+              {item.isTodaySpecial && (
+                <Badge variant="special" className="text-xs">
+                  <Star className="mr-1 h-3 w-3 fill-current" />
+                  Special
+                </Badge>
+              )}
+              {item.isBestSelling && (
+                <Badge className="bg-status-preparing/20 text-status-preparing text-xs">
+                  <TrendingUp className="mr-1 h-3 w-3" />
+                  Best Selling
+                </Badge>
+              )}
+              {item.isLowestPrice && (
+                <Badge className="bg-status-ready/20 text-status-ready text-xs">
+                  <TrendingDown className="mr-1 h-3 w-3" />
+                  Lowest
+                </Badge>
+              )}
+              {item.discount && (
+                <Badge variant="discount" className="text-xs">
+                  {item.discount}% OFF
+                </Badge>
+              )}
+            </div>
 
             <p className="mt-2 text-sm text-muted-foreground">
               {item.description || "No description"}
@@ -294,6 +418,24 @@ export default function MenuPage() {
           </div>
         ))}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{itemToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently remove the item from your menu.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
