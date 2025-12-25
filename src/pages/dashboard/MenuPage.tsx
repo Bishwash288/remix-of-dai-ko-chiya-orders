@@ -49,7 +49,7 @@ export default function MenuPage() {
     name: "",
     description: "",
     price: "",
-    originalPrice: "",
+    discountPercent: "",
     category: "tea" as MenuItem["category"],
     isTodaySpecial: false,
     isBestSelling: false,
@@ -72,8 +72,9 @@ export default function MenuPage() {
       return;
     }
 
-    const discount = formData.originalPrice
-      ? Math.round(((Number(formData.originalPrice) - Number(formData.price)) / Number(formData.originalPrice)) * 100)
+    const discount = formData.discountPercent ? Number(formData.discountPercent) : undefined;
+    const originalPrice = discount
+      ? Math.round(Number(formData.price) / (1 - discount / 100))
       : undefined;
 
     if (editingItem) {
@@ -81,7 +82,7 @@ export default function MenuPage() {
         name: formData.name,
         description: formData.description,
         price: Number(formData.price),
-        originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
+        originalPrice: originalPrice,
         category: formData.category,
         isTodaySpecial: formData.isTodaySpecial,
         isBestSelling: formData.isBestSelling,
@@ -96,7 +97,7 @@ export default function MenuPage() {
         name: formData.name,
         description: formData.description,
         price: Number(formData.price),
-        originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
+        originalPrice: originalPrice,
         category: formData.category,
         isAvailable: formData.isAvailable,
         isTodaySpecial: formData.isTodaySpecial,
@@ -114,7 +115,7 @@ export default function MenuPage() {
       name: "",
       description: "",
       price: "",
-      originalPrice: "",
+      discountPercent: "",
       category: "tea",
       isTodaySpecial: false,
       isBestSelling: false,
@@ -131,7 +132,7 @@ export default function MenuPage() {
       name: item.name,
       description: item.description,
       price: item.price.toString(),
-      originalPrice: item.originalPrice?.toString() || "",
+      discountPercent: item.discount?.toString() || "",
       category: item.category,
       isTodaySpecial: item.isTodaySpecial,
       isBestSelling: item.isBestSelling,
@@ -217,15 +218,23 @@ export default function MenuPage() {
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     placeholder="40"
                   />
+                  <p className="text-xs text-muted-foreground">Final selling price</p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Original Price (for discount)</Label>
+                  <Label>Discount %</Label>
                   <Input
                     type="number"
-                    value={formData.originalPrice}
-                    onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
-                    placeholder="100"
+                    min="0"
+                    max="100"
+                    value={formData.discountPercent}
+                    onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
+                    placeholder="10"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {formData.price && formData.discountPercent ?
+                      `Original: Rs. ${Math.round(Number(formData.price) / (1 - Number(formData.discountPercent) / 100))}` :
+                      'Optional discount'}
+                  </p>
                 </div>
               </div>
               <div className="space-y-2">
